@@ -37,8 +37,8 @@ void FillBlock(const block* prev_block, const block* ref_block, block* next_bloc
         for (int i = 0; i < 6 * 16; ++i) {
             uint32_t x1 = x >> 32;
             uint32_t x2 = x & 0xFFFFFFFF;
-            uint64_t y = Sbox[x1 & SBOX_MASK];
-            uint64_t z = Sbox[x2 & SBOX_MASK + SBOX_SIZE / 2];
+            uint64_t y = Sbox[(x1 & SBOX_MASK)];
+            uint64_t z = Sbox[(x2 & SBOX_MASK) + SBOX_SIZE / 2];
             x = (uint64_t) x1 * (uint64_t) x2;
             x += y;
             x ^= z;
