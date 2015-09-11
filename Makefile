@@ -8,9 +8,8 @@
 #
 
 
-CC = g++
-REF_CFLAGS = -std=c++11 -pthread -O3
-OPT_CFLAGS = -std=c++11 -pthread -O3 -m64 -mavx
+REF_CFLAGS = -std=c99 -pthread -O3
+OPT_CFLAGS = -std=c99 -pthread -O3 -m64 -mavx
 
 
 ARGON2_DIR = Source/Argon2
@@ -19,13 +18,13 @@ BLAKE2_DIR = Source/Blake2
 TEST_DIR = Source/Test
 COMMON_DIR = Source/Common
 
-ARGON2_SOURCES = argon2.cpp
-CORE_SOURCES = argon2-core.cpp kat.cpp
-BLAKE2_SOURCES = blake2b-ref.cpp
-TEST_SOURCES = argon2-test.cpp
+ARGON2_SOURCES = argon2.c
+CORE_SOURCES = argon2-core.c kat.c
+BLAKE2_SOURCES = blake2b-ref.c
+TEST_SOURCES = argon2-test.c
 
-REF_CORE_SOURCE = argon2-ref-core.cpp
-OPT_CORE_SOURCE = argon2-opt-core.cpp
+REF_CORE_SOURCE = argon2-ref-core.c
+OPT_CORE_SOURCE = argon2-opt-core.c
 
 
 BUILD_DIR = Build
