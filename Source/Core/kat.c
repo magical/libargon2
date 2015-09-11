@@ -18,7 +18,7 @@
 
 #ifdef KAT
 
-void InitialKat(const uint8_t* blockhash, const Argon2_Context* context, Argon2_type type) {
+void InitialKat(const uint8_t* blockhash, const Argon2_Context* context, enum Argon2_type type) {
     FILE* fp = fopen(KAT_FILENAME, "a+");
 
     if (fp && blockhash != NULL && context != NULL) {
