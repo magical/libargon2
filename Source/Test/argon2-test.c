@@ -8,13 +8,10 @@
  */
 
 
+#include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
-#include <random>
-#include <cstring>
-#include <algorithm>
-#include <vector>
-#include <string>
+#include <string.h>
 
 #include "time.h"
 #include "argon2.h"
@@ -27,7 +24,7 @@
  * Custom allocate memory
  */
 int CustomAllocateMemory(uint8_t **memory, size_t length) {
-    *memory = new uint8_t[length];
+    *memory = malloc(length);
     if (!*memory) {
         return ARGON2_MEMORY_ALLOCATION_ERROR;
     }
@@ -39,7 +36,7 @@ int CustomAllocateMemory(uint8_t **memory, size_t length) {
  */
 void CustomFreeMemory(uint8_t *memory, size_t length) {
     if (memory) {
-        delete[] memory;
+        free(memory);
     }
 }
 
@@ -70,8 +67,28 @@ void GenKat() {
 #endif
 
                         //Argon2_Context context(out, outlen, zero_array, p_len, one_array, s_len, NULL, 0, NULL, 0, t_cost, m_cost, thr);
-                        Argon2_Context context(out, outlen, zero_array, p_len, one_array, s_len, NULL, 0, NULL, 0,
-                                t_cost, m_cost, thr, CustomAllocateMemory, CustomFreeMemory);
+                        Argon2_Context context = {
+                                .out = out,
+                                .outlen = outlen,
+                                .pwd = zero_array,
+                                .pwdlen = p_len,
+                                .salt = one_array,
+                                .saltlen = s_len,
+                                .secret = NULL,
+                                .secretlen = 0,
+                                .ad = NULL,
+                                .adlen = 0,
+                                .t_cost = t_cost,
+                                .m_cost = m_cost,
+                                .lanes = thr,
+
+                                .clear_password = true,
+                                .clear_secret = true,
+                                .clear_memory = false,
+
+                                .allocate_cbk = CustomAllocateMemory,
+                                .free_cbk = CustomFreeMemory
+                        };
                         int result = Argon2d(&context);
 
                         if (ARGON2_OK != result) {
@@ -119,10 +136,11 @@ void Benchmark() {
 
     memset(zero_array, 0, inlen);
     memset(one_array, 1, 256);
-    std::vector<uint32_t> thread_test = {1, 2, 4, 6, 8, 16};
+    uint32_t thread_test[] = {1, 2, 4, 6, 8, 16};
 
     for (uint32_t m_cost = (uint32_t) 1 << 10; m_cost <= (uint32_t) 1 << 22; m_cost *= 2) {
-        for (uint32_t thread_n : thread_test) {
+        for (int thread_i = 0; thread_i < sizeof thread_test / sizeof *thread_test; thread_i++) {
+            uint32_t thread_n = thread_test[thread_i];
 
 #ifdef _MEASURE
             uint64_t start_cycles, stop_cycles, stop_cycles_i, stop_cycles_di, stop_cycles_ds;
@@ -132,7 +150,21 @@ void Benchmark() {
             start_cycles = __rdtscp(&ui1);
 #endif
 
-            Argon2_Context context(out, outlen, zero_array, inlen, one_array, saltlen, NULL, 0, NULL, 0, t_cost, m_cost, thread_n,NULL,NULL,false,false, false);
+            Argon2_Context context = {
+                .out = out,
+                .outlen = outlen,
+                .pwd = zero_array,
+                .pwdlen = inlen,
+                .salt = one_array,
+                .saltlen = saltlen,
+                .secret = NULL,
+                .secretlen = 0,
+                .ad = NULL,
+                .adlen = 0,
+                .t_cost = t_cost,
+                .m_cost = m_cost,
+                .lanes = thread_n
+            };
             Argon2d(&context);
 
 #ifdef _MEASURE
@@ -202,7 +234,7 @@ void Run(void *out, size_t outlen, size_t inlen, size_t saltlen, uint32_t t_cost
 
 }
 
-void GenerateTestVectors(const std::string &type) {
+void GenerateTestVectors(const char *type) {
     const unsigned out_length = 32;
     const unsigned pwd_length = 32;
     const unsigned salt_length = 16;
@@ -235,79 +267,38 @@ void GenerateTestVectors(const std::string &type) {
     printf("Enable KAT to generate the test vectors.\n");
 #endif
 
-    Argon2_Context context(out, out_length, pwd, pwd_length, salt, salt_length,
+    Argon2_Context context = {out, out_length, pwd, pwd_length, salt, salt_length,
             secret, secret_length, ad, ad_length, t_cost, m_cost, lanes,
             myown_allocator, myown_deallocator,
-            clear_password, clear_secret, clear_memory);
+            clear_password, clear_secret, clear_memory};
 
-    if (type == std::string("Argon2d")) {
+    if (strcmp(type, "Argon2d") == 0) {
         printf("Test Argon2d\n");
         Argon2d(&context);
         return;
     }
-    if (type == std::string("Argon2i")) {
+    if (strcmp(type, "Argon2i") == 0) {
         printf("Test Argon2i\n");
         Argon2i(&context);
         return;
     }
-    if (type == std::string("Argon2di")) {
+    if (strcmp(type, "Argon2di") == 0) {
         printf("Test Argon2di\n");
         Argon2i(&context);
         return;
     }
-    if (type == std::string("Argon2ds")) {
+    if (strcmp(type, "Argon2ds") == 0) {
         printf("Test Argon2ds\n");
         Argon2ds(&context);
         return;
     }
-    if (type == std::string("Argon2id")) {
+    if (strcmp(type, "Argon2id") == 0) {
         printf("Test Argon2id\n");
         Argon2id(&context);
         return;
     }
 
     printf("Wrong Argon2 type!\n");
-}
-
-void VerifyTest(bool modify = false) {
-    const unsigned int out_length = 128;
-    const unsigned int in_length = 256;
-
-    unsigned char out[out_length];
-    unsigned char zero_array1[in_length];
-    unsigned char one_array1[in_length];
-
-    unsigned t_cost = 3;
-    unsigned m_cost = 16;
-    unsigned thread_n = 4;
-
-    memset(zero_array1, 0, in_length);
-    memset(one_array1, 1, in_length);
-
-    unsigned char hash[out_length];
-
-    bool clear_input = false;
-    bool clear_memory = false;
-
-    Argon2_Context context(out, out_length, zero_array1, in_length,
-            one_array1, in_length, NULL, 0, NULL, 0,
-            t_cost, m_cost, thread_n,
-            NULL, NULL,
-            clear_input, clear_input, clear_memory);
-    Argon2d(&context);
-
-    memcpy(hash, context.out, std::min(context.outlen, out_length));
-
-    if (modify) {
-        // Change the hash value
-        hash[0]++;
-    }
-
-    if (VerifyD(&context, (const char *) hash)) {
-        printf("Password is correct!\n");
-    } else {
-        printf("Password is wrong!\n");
-    }
 }
 
 int main(int argc, char* argv[]) {
@@ -324,7 +315,7 @@ int main(int argc, char* argv[]) {
 
     bool generate_test_vectors = false;
     //char type[argon2_type_length] = "Argon2d";
-    std::string type;
+    char *type;
 
 #ifdef KAT
     remove(KAT_FILENAME);
@@ -349,7 +340,6 @@ int main(int argc, char* argv[]) {
             printf("\t -threads < Number of threads : % d.. % d>\n", MIN_LANES, MAX_LANES);
             printf("\t -type <Argon2d; Argon2di; Argon2ds; Argon2i; Argon2id >\n");
             printf("\t -gen-tv\n");
-            printf("\t -verify\n");
             printf("\t -benchmark\n");
             printf("\t -help\n");
             printf("If no arguments given, Argon2 is called with default parameters t_cost=%d, m_cost=%d and threads=%d.\n", t_cost, m_cost, thread_n);
@@ -407,7 +397,7 @@ int main(int argc, char* argv[]) {
         if (strcmp(argv[i], "-type") == 0) {
             if (i < argc - 1) {
                 i++;
-                type = std::string(argv[i]);
+                type = argv[i];
                 //                      if (argon2_type_length >= strlen(argv[i])) {
                 //                   memcpy(type, argv[i], strlen(argv[i]));
                 //              }
@@ -418,19 +408,6 @@ int main(int argc, char* argv[]) {
         if (strcmp(argv[i], "-gen-tv") == 0) {
             generate_test_vectors = true;
             continue;
-        }
-
-        if (strcmp(argv[i], "-verify") == 0) {
-            bool modify = false;
-            if (i < argc - 1) {
-                i++;
-                if (0 != atoi(argv[i])) {
-                    modify = true;
-                }
-            }
-
-            VerifyTest(modify);
-            return 0;
         }
 
         if (strcmp(argv[i], "-benchmark") == 0) {

@@ -8,7 +8,7 @@
  */
 
 
-#include <cstdio>
+#include <stdio.h>
 #include <inttypes.h>
 
 #include "argon2.h"

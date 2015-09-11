@@ -20,7 +20,7 @@
  * @pre blockhash must point to INPUT_INITIAL_HASH_LENGTH bytes
  * @pre context member pointers must point to allocated memory of size according to the length values
  */
-void InitialKat(const uint8_t* blockhash, const Argon2_Context* context, Argon2_type type);
+void InitialKat(const uint8_t* blockhash, const Argon2_Context* context, enum Argon2_type type);
 
 /*
  * Function that prints the output tag

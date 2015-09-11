@@ -11,7 +11,8 @@
 #ifndef __ARGON2_H__
 #define __ARGON2_H__
 
-#include <cstddef>
+#include <stddef.h>
+#include <stdbool.h>
 
 
 /************************* Constants to enable Known Answer Tests (KAT)  **************************************************/
@@ -29,39 +30,39 @@ extern const char* KAT_FILENAME;
 /*************************Argon2 input parameter restrictions**************************************************/
 
 /* Minimum and maximum number of lanes (degree of parallelism) */
-const uint8_t MIN_LANES = 1;
-const uint8_t MAX_LANES = 255;
+enum { MIN_LANES = 1 };
+enum { MAX_LANES = 255 };
 
 /* Number of synchronization points between lanes per pass */
-const uint32_t SYNC_POINTS = 4;
+enum { SYNC_POINTS = 4 };
 
 /* Minimum and maximum digest size in bytes */
-const uint32_t MIN_OUTLEN = 4;
-const uint32_t MAX_OUTLEN = 0xFFFFFFFF;
+#define MIN_OUTLEN 4
+#define MAX_OUTLEN 0xFFFFFFFF
 
 /* Minimum and maximum number of memory blocks (each of BLOCK_SIZE bytes) */
-const uint32_t MIN_MEMORY = 2 * SYNC_POINTS; // 2 blocks per slice
-const uint32_t MAX_MEMORY = 0xFFFFFFFF; // 2^32-1 blocks
+#define MIN_MEMORY (2 * SYNC_POINTS) // 2 blocks per slice
+#define MAX_MEMORY 0xFFFFFFFF // 2^32-1 blocks
 
 /* Minimum and maximum number of passes */
-const uint32_t MIN_TIME = 1;
-const uint32_t MAX_TIME = 0xFFFFFFFF;
+#define MIN_TIME 1
+#define MAX_TIME 0xFFFFFFFF
 
 /* Minimum and maximum password length in bytes */
-const uint32_t MIN_PWD_LENGTH = 0;
-const uint32_t MAX_PWD_LENGTH = 0xFFFFFFFF;
+#define MIN_PWD_LENGTH 0
+#define MAX_PWD_LENGTH 0xFFFFFFFF
 
 /* Minimum and maximum associated data length in bytes */
-const uint32_t MIN_AD_LENGTH = 0;
-const uint32_t MAX_AD_LENGTH = 0xFFFFFFFF;
+#define MIN_AD_LENGTH 0
+#define MAX_AD_LENGTH 0xFFFFFFFF
 
 /* Minimum and maximum salt length in bytes */
-const uint32_t MIN_SALT_LENGTH = 8;
-const uint32_t MAX_SALT_LENGTH = 0xFFFFFFFF;
+#define MIN_SALT_LENGTH 8
+#define MAX_SALT_LENGTH 0xFFFFFFFF
 
 /* Minimum and maximum key length in bytes */
-const uint32_t MIN_SECRET = 0;
-const uint32_t MAX_SECRET = 0xFFFFFFFF;
+#define MIN_SECRET 0
+#define MAX_SECRET 0xFFFFFFFF
 
 /************************* Error codes *********************************************************************************/
 enum Argon2_ErrorCodes {
@@ -139,6 +140,7 @@ typedef void(*FreeMemoryCallback)(uint8_t *memory, size_t bytes_to_allocate);
  Then you initialize
  Argon2_Context(out,8,pwd,32,salt,16,NULL,0,NULL,0,5,1<<20,4,NULL,NULL,true,false,false).
  */
+typedef struct Argon2_Context Argon2_Context;
 struct Argon2_Context {
     uint8_t *out; //output array
     const uint32_t outlen; //digest length
@@ -165,21 +167,6 @@ struct Argon2_Context {
     const bool clear_password; //whether to clear the password array
     const bool clear_secret; //whether to clear the secret array
     const bool clear_memory; //whether to clear the memory after the run
-
-    Argon2_Context(uint8_t *o, uint32_t olen,
-            /*const*/ uint8_t *m, uint32_t mlen,
-            /*const*/ uint8_t *n, uint32_t nlen,
-            /*const*/ uint8_t *s, uint32_t slen,
-            /*const*/ uint8_t *a, uint32_t alen,
-            uint32_t t_c, uint32_t m_c, uint32_t l,
-            AllocateMemoryCallback a_cbk = NULL, FreeMemoryCallback f_cbk = NULL, bool c_p = true, bool c_s = true, bool c_m = false) : out(o), outlen(olen),
-    pwd(m), pwdlen(mlen),
-    salt(n), saltlen(nlen),
-    secret(s), secretlen(slen),
-    ad(a), adlen(alen),
-    t_cost(t_c), m_cost(m_c), lanes(l),
-    allocate_cbk(a_cbk), free_cbk(f_cbk), clear_password(c_p), clear_secret(c_s), clear_memory(c_m) {
-    }
 };
 
 /**
@@ -195,7 +182,7 @@ struct Argon2_Context {
  * @pre    @a saltlen must be at least @saltlen bytes long
  * @return Zero if successful, 1 otherwise.
  */
-extern "C" int PHS(void *out, size_t outlen, const void *in, size_t inlen, const void *salt, size_t saltlen,
+int PHS(void *out, size_t outlen, const void *in, size_t inlen, const void *salt, size_t saltlen,
         unsigned int t_cost, unsigned int m_cost);
 
 /*
@@ -238,15 +225,7 @@ extern int Argon2ds(Argon2_Context* context);
 extern int Argon2id(Argon2_Context* context);
 
 /*
- * Verify if a given password is correct for Argon2d hashing
- * @param  context  Pointer to current Argon2 context
- * @param  hash  The password hash to verify. The length of the hash is specified by the context outlen member
- * @return  Zero if successful, a non zero error code otherwise
- */
-extern int VerifyD(Argon2_Context* context, const char *hash);
-
-/*
- * Get the associated error message for given erro code
+ * Get the associated error message for given errno code
  * @return  The error message associated with the given error code
  */
 const char* ErrorMessage(int error_code);

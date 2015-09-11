@@ -49,76 +49,58 @@ else
 endif
 
 
+ARGON2_OBJECTS = $(ARGON2_BUILD_SOURCES:.c=.o)
+CORE_OBJECTS =  $(CORE_BUILD_SOURCES:.c=.o)
+BLAKE2_OBJECTS = $(BLAKE2_BUILD_SOURCES:.c=.o)
+TEST_OBJECTS = $(TEST_BUILD_SOURCES:.c=.o)
+
+INCLUDES= -I$(ARGON2_DIR) -I$(CORE_DIR) -I$(BLAKE2_DIR) -I$(TEST_DIR) -I$(COMMON_DIR)
+
 .PHONY: all
-all: cleanall argon2 argon2-tv argon2-lib argon2-lib-test
+all: argon2 argon2-tv argon2-lib argon2-lib-test
+argon2: $(BUILD_DIR)/argon2
+argon2-tv: $(BUILD_DIR)/argon2-tv
+argon2-lib: $(BUILD_DIR)/lib$(LIBNAME).so
+argon2-lib-test: $(BUILD_DIR)/argon2-lib-test
 
+%.o: %.c
+	@echo CC $@
+	@$(CC) $(CFLAGS) $(INCLUDES) -c -o $@ $<
 
-.PHONY: argon2
-argon2:
+$(BUILD_DIR)/argon2: $(ARGON2_OBJECTS) $(CORE_OBJECTS) $(BLAKE2_OBJECTS) $(TEST_OBJECTS)
 	$(CC) $(CFLAGS) \
-		$(ARGON2_BUILD_SOURCES) \
-		$(CORE_BUILD_SOURCES) \
-		$(BLAKE2_BUILD_SOURCES) \
-		$(TEST_BUILD_SOURCES) \
-		-I$(ARGON2_DIR) \
-		-I$(CORE_DIR) \
-		-I$(BLAKE2_DIR) \
-		-I$(TEST_DIR) \
-		-I$(COMMON_DIR) \
-		-o $(BUILD_DIR)/$@
+		$(INCLUDES) \
+		-o $@ $^
 
 
-argon2-tv:
+$(BUILD_DIR)/argon2-tv: $(ARGON2_OBJECTS) $(CORE_OBJECTS) $(BLAKE2_OBJECTS) $(TEST_OBJECTS)
 	$(CC) $(CFLAGS) \
 		-DKAT -DKAT_INTERNAL \
-		$(ARGON2_BUILD_SOURCES) \
-		$(CORE_BUILD_SOURCES) \
-		$(BLAKE2_BUILD_SOURCES) \
-		$(TEST_BUILD_SOURCES) \
-		-I$(ARGON2_DIR) \
-		-I$(CORE_DIR) \
-		-I$(BLAKE2_DIR) \
-		-I$(TEST_DIR) \
-		-I$(COMMON_DIR) \
-		-o $(BUILD_DIR)/$@
+		$(INCLUDES) \
+		-o $@ $^
 
 
-.PHONY: argon2-lib
-argon2-lib:
+$(BUILD_DIR)/libargon2.so: $(ARGON2_BUILD_SOURCES) $(CORE_BUILD_SOURCES) $(BLAKE2_BUILD_SOURCES)
 	$(CC) $(CFLAGS) \
 		-shared -fPIC \
+		$(INCLUDES) \
 		$(ARGON2_BUILD_SOURCES) \
 		$(CORE_BUILD_SOURCES) \
 		$(BLAKE2_BUILD_SOURCES) \
-		-I$(ARGON2_DIR) \
-		-I$(CORE_DIR) \
-		-I$(BLAKE2_DIR) \
-		-I$(COMMON_DIR) \
-		-o $(BUILD_DIR)/lib$(LIBNAME).so
+		-o $@
 
 
-.PHONY: argon2-lib-test
-argon2-lib-test:
+$(BUILD_DIR)/argon2-lib-test: $(TEST_OBJECTS) argon2-lib
 	$(CC) $(CFLAGS) \
-		$(TEST_BUILD_SOURCES) \
 		-I$(ARGON2_DIR) \
 		-I$(TEST_DIR) \
 		-L$(BUILD_DIR) \
 		-Wl,-rpath=$(BUILD_DIR) \
 		-l$(LIBNAME) \
-		-o $(BUILD_DIR)/$@
+		-o $@ \
+		$(TEST_OBJECTS)
 
 
 .PHONY: clean
 clean:
 	rm -f $(BUILD_DIR)/*
-
-
-.PHONY: cleanall
-cleanall: clean
-	rm -f *~
-	rm -f $(ARGON2_DIR)/*~
-	rm -f $(CORE_DIR)/*~
-	rm -f $(BLAKE2_DIR)/*~
-	rm -f $(TEST_DIR)/*~
-	rm -f $(COMMON_DIR)/*~

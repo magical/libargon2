@@ -8,6 +8,7 @@
  */
 
 
+#include <stdlib.h>
 #include <stdint.h>
 
 
@@ -27,9 +28,11 @@ const char* KAT_FILENAME = "kat-argon2-ref.log";
 #endif
 
 
-void FillBlock(const block* prev_block, const block* ref_block, block* next_block, const uint64_t* Sbox) {
-    block blockR = *prev_block ^ *ref_block;
-    block block_tmp = blockR;
+void FillBlock(const block prev_block, const block ref_block, block next_block, const uint64_t* Sbox) {
+    block blockR;
+    block block_tmp;
+    XORBlocks(blockR, prev_block, ref_block);
+    memmove(block_tmp, blockR, sizeof(block));
 
     uint64_t x = 0;
     if (Sbox != NULL) {
@@ -61,26 +64,28 @@ void FillBlock(const block* prev_block, const block* ref_block, block* next_bloc
                 blockR[2 * i + 96], blockR[2 * i + 97], blockR[2 * i + 112], blockR[2 * i + 113]);
     }
 
-    *next_block = blockR ^ block_tmp;
-    next_block->v[0] += x;
-    next_block->v[WORDS_IN_BLOCK - 1] += x;
+    XORBlocks(next_block, blockR, block_tmp);
+    next_block[0] += x;
+    next_block[WORDS_IN_BLOCK - 1] += x;
 }
 
 void GenerateAddresses(const Argon2_instance_t* instance, const Argon2_position_t* position, uint64_t* pseudo_rands) {
-    block zero_block(0), input_block(0), address_block(0);
+    static block zero_block;
+    block input_block = {0};
+    block address_block = {0};
     if (instance != NULL && position != NULL) {
-        input_block.v[0] = position->pass;
-        input_block.v[1] = position->lane;
-        input_block.v[2] = position->slice;
-        input_block.v[3] = instance->memory_blocks;
-        input_block.v[4] = instance->passes;
-        input_block.v[5] = instance->type;
+        input_block[0] = position->pass;
+        input_block[1] = position->lane;
+        input_block[2] = position->slice;
+        input_block[3] = instance->memory_blocks;
+        input_block[4] = instance->passes;
+        input_block[5] = instance->type;
 
         for (uint32_t i = 0; i < instance->segment_length; ++i) {
             if (i % ADDRESSES_IN_BLOCK == 0) {
-                input_block.v[6]++;
-                FillBlock(&zero_block, &input_block, &address_block, NULL);
-                FillBlock(&zero_block, &address_block, &address_block, NULL);
+                input_block[6]++;
+                FillBlock(zero_block, input_block, address_block, NULL);
+                FillBlock(zero_block, address_block, address_block, NULL);
             }
             pseudo_rands[i] = address_block[i % ADDRESSES_IN_BLOCK];
         }
@@ -90,12 +95,12 @@ void GenerateAddresses(const Argon2_instance_t* instance, const Argon2_position_
 void FillSegment(const Argon2_instance_t* instance, Argon2_position_t position) {
     uint64_t pseudo_rand, ref_index, ref_lane;
     uint32_t prev_offset, curr_offset;
-	bool data_independent_addressing = (instance->type == Argon2_i) || (instance->type == Argon2_id && (position.pass == 0) && (position.slice < SYNC_POINTS / 2));
+    bool data_independent_addressing = (instance->type == Argon2_i) || (instance->type == Argon2_id && (position.pass == 0) && (position.slice < SYNC_POINTS / 2));
     if (instance != NULL) {
         // Pseudo-random values that determine the reference block position
-        uint64_t *pseudo_rands = new uint64_t[instance->segment_length];
+        uint64_t *pseudo_rands = malloc(instance->segment_length * sizeof(uint64_t));
         if (pseudo_rands != NULL) {
-			if (data_independent_addressing) {
+            if (data_independent_addressing) {
                 GenerateAddresses(instance, &position, pseudo_rands);
             }
 
@@ -122,7 +127,7 @@ void FillSegment(const Argon2_instance_t* instance, Argon2_position_t position) 
 
                 /* 1.2 Computing the index of the reference block */
                 /* 1.2.1 Taking pseudo-random value from the previous block */
-				if (data_independent_addressing) {
+                if (data_independent_addressing) {
                     pseudo_rand = pseudo_rands[i];
                 } else {
                     pseudo_rand = instance->state[prev_offset][0];
@@ -140,26 +145,30 @@ void FillSegment(const Argon2_instance_t* instance, Argon2_position_t position) 
                 ref_index = IndexAlpha(instance, &position, pseudo_rand & 0xFFFFFFFF, ref_lane == position.lane);
 
                 /* 2 Creating a new block */
-                block* ref_block = instance->state + instance->lane_length * ref_lane + ref_index;
-                block* curr_block = instance->state + curr_offset;
-                FillBlock(instance->state + prev_offset, ref_block, curr_block, instance->Sbox);
+                uint64_t* ref_block = instance->state[instance->lane_length * ref_lane + ref_index];
+                uint64_t* curr_block = instance->state[curr_offset];
+                uint64_t* prev_block = instance->state[prev_offset];
+                FillBlock(prev_block, ref_block, curr_block, instance->Sbox);
             }
 
-            delete[] pseudo_rands;
+            free(pseudo_rands);
         }
     }
 }
 
 void GenerateSbox(Argon2_instance_t* instance) {
-    block zero_block(0), start_block(instance->state[0]), out_block(0);
+    static block zero_block;
+    block start_block;
+    block out_block = {0};
+    memmove(start_block, instance->state[0], sizeof(block));
     if (instance == NULL)
         return;
     if (instance->Sbox == NULL)
-        instance->Sbox = new uint64_t[SBOX_SIZE];
+        instance->Sbox = malloc(SBOX_SIZE * sizeof(uint64_t));
 
     for (uint32_t i = 0; i < SBOX_SIZE / WORDS_IN_BLOCK; ++i) {
-        FillBlock(&zero_block, &start_block, &out_block, NULL);
-        FillBlock(&zero_block, &out_block, &start_block, NULL);
-        memcpy(instance->Sbox + i*WORDS_IN_BLOCK, start_block.v, BLOCK_SIZE);
+        FillBlock(zero_block, start_block, out_block, NULL);
+        FillBlock(zero_block, out_block, start_block, NULL);
+        memmove(instance->Sbox + i*WORDS_IN_BLOCK, start_block, BLOCK_SIZE);
     }
 }
