@@ -35,6 +35,7 @@ int CustomAllocateMemory(uint8_t **memory, size_t length) {
  * Custom free memory
  */
 void CustomFreeMemory(uint8_t *memory, size_t length) {
+    (void)length;
     if (memory) {
         free(memory);
     }
@@ -139,7 +140,7 @@ void Benchmark() {
     uint32_t thread_test[] = {1, 2, 4, 6, 8, 16};
 
     for (uint32_t m_cost = (uint32_t) 1 << 10; m_cost <= (uint32_t) 1 << 22; m_cost *= 2) {
-        for (int thread_i = 0; thread_i < sizeof thread_test / sizeof *thread_test; thread_i++) {
+        for (uint32_t thread_i = 0; thread_i < sizeof thread_test / sizeof *thread_test; thread_i++) {
             uint32_t thread_n = thread_test[thread_i];
 
 #ifdef _MEASURE
@@ -314,8 +315,7 @@ int main(int argc, char* argv[]) {
     uint32_t s_len = 16;
 
     bool generate_test_vectors = false;
-    //char type[argon2_type_length] = "Argon2d";
-    char *type;
+    char *type = "Argon2d";
 
 #ifdef KAT
     remove(KAT_FILENAME);

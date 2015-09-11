@@ -8,8 +8,8 @@
 #
 
 
-REF_CFLAGS = -std=c99 -pthread -O3
-OPT_CFLAGS = -std=c99 -pthread -O3 -m64 -mavx
+REF_CFLAGS = -std=c99 -pthread -Wall -Wextra -O3
+OPT_CFLAGS = -std=c99 -pthread -Wall -Wextra -O3 -m64 -mavx
 
 
 ARGON2_DIR = Source/Argon2
